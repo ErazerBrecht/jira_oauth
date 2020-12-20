@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using Atlassian.Jira;
 using Atlassian.Jira.OAuth;
@@ -27,12 +28,13 @@ namespace JiraOauth
         {
             _url = "http://localhost:8001";
             _consumerKey = "OauthKey";
-
-            var pemSecret = File.ReadAllText("jira_privatekey.pem");
-            var privateKey = pemSecret;
+            
+            var privateKey = File.ReadAllText("jira_privatekey.pem");
+            // You could also do it without third party nuget
+            // https://vcsjones.dev/2019/10/07/key-formats-dotnet-3/
             var decoder = new OpenSSL.PrivateKeyDecoder.OpenSSLPrivateKeyDecoder();
             var keyInfo = decoder.Decode(privateKey);
-            _consumerSecret = OpenSSL.PrivateKeyDecoder.RSAExtensions.ToXmlString(keyInfo, true);
+            _consumerSecret = keyInfo.ToXmlString(true);
         }
 
         // This method gets called by the runtime. Use this method to add services to the container.
@@ -53,10 +55,11 @@ namespace JiraOauth
 
             app.UseEndpoints(endpoints =>
             {
+                // Start OAUTH flow => Redirect to JIRA
                 endpoints.MapGet("/", async context =>
                 {
                     var settings = new JiraOAuthRequestTokenSettings(_url, _consumerKey, _consumerSecret,
-                        "http://localhost:1234/callback");
+                        $"{context.Request.Scheme}://{context.Request.Host}/callback");
 
                     var requestToken = await JiraOAuthTokenHelper.GenerateRequestTokenAsync(settings);
                     var requestTokenId = Guid.NewGuid();
@@ -67,6 +70,7 @@ namespace JiraOauth
                     context.Response.Redirect(requestToken.AuthorizeUri);
                 });
 
+                // Callback when request is allowed in JIRA
                 endpoints.MapGet("/callback", async context =>
                 {
                     var exists =
@@ -100,6 +104,7 @@ namespace JiraOauth
                     context.Response.Redirect("/result");
                 });
 
+                // Doing an authorized API call to JIRA
                 endpoints.MapGet("/result", async context =>
                 {
                     var requestTokenExists = context.Request.Cookies.TryGetValue("JiraRequestTokenCookie", out var stringRequestTokenId);
@@ -119,13 +124,14 @@ namespace JiraOauth
 
                     var jira = Jira.CreateOAuthRestClient(_url, _consumerKey, _consumerSecret, accessToken, requestToken.OAuthTokenSecret);
 
+                    // JSS is the project key from JIRA 
+                    // The name is nostalgia reason ;)
                     var result = await jira.Issues.GetIssuesFromJqlAsync("project = JSS");
-                    var issue = result.First();
-                    var vm = new
+                    var vm = result.Select(issue => new
                     {
                         Created = issue.Created, Description = issue.Description, Title = issue.Summary,
                         Reporter = issue.Reporter, Type = issue.Type.Name, Priority = issue.Priority.Name
-                    };
+                    });
                     await context.Response.WriteAsJsonAsync(vm);
                 });
             });

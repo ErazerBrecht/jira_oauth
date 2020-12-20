@@ -66,7 +66,7 @@ namespace JiraOauth.OAuthTokenHelper
         public string OAuthTokenSecret { get; }
 
         /// <summary>
-        /// TODO => Missing in SKD!!!!
+        /// TODO => Missing in SDK!!!!
         /// </summary>
         public string OAuthVerifier { get; set; }
 
