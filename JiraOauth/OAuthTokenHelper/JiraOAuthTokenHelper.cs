@@ -90,7 +90,7 @@ namespace JiraOauth.OAuthTokenHelper
                 oAuthAccessTokenSettings.OAuthRequestToken,
                 oAuthAccessTokenSettings.OAuthTokenSecret,
                 oAuthAccessTokenSettings.OAuthVerifier);
-            authenticator.SignatureMethod = oAuthAccessTokenSettings.SignatureMethod.ToOAuthSignatureMethod();;
+            authenticator.SignatureMethod = oAuthAccessTokenSettings.SignatureMethod.ToOAuthSignatureMethod();
             
             var restClient = new RestClient(oAuthAccessTokenSettings.Url)
             {

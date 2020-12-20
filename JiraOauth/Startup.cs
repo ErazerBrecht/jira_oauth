@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
+using System.Security.Authentication;
 using System.Threading;
 using Atlassian.Jira;
 using Atlassian.Jira.OAuth;
@@ -62,8 +62,11 @@ namespace JiraOauth
                         $"{context.Request.Scheme}://{context.Request.Host}/callback");
 
                     var requestToken = await JiraOAuthTokenHelper.GenerateRequestTokenAsync(settings);
-                    var requestTokenId = Guid.NewGuid();
 
+                    if (requestToken == null)
+                        throw new AuthenticationException("Failed retrieving RequestToken");
+                    
+                    var requestTokenId = Guid.NewGuid();
                     _requestTokenDb.Add(requestTokenId, requestToken);
 
                     context.Response.Cookies.Append("JiraRequestTokenCookie", requestTokenId.ToString());
@@ -73,8 +76,7 @@ namespace JiraOauth
                 // Callback when request is allowed in JIRA
                 endpoints.MapGet("/callback", async context =>
                 {
-                    var exists =
-                        context.Request.Cookies.TryGetValue("JiraRequestTokenCookie", out var stringRequestTokenId);
+                    var exists = context.Request.Cookies.TryGetValue("JiraRequestTokenCookie", out var stringRequestTokenId);
                     if (!exists || !Guid.TryParse(stringRequestTokenId, out var requestTokenId) ||
                         !_requestTokenDb.ContainsKey(requestTokenId))
                     {
